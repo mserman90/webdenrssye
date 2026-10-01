@@ -18,7 +18,16 @@ const BLOCKED_HOSTNAMES = new Set([
 
 export function isSafeUrl(rawUrl: string): { safe: boolean; reason?: string; url?: URL } {
   try {
-    const parsed = new URL(rawUrl);
+    if (!rawUrl || typeof rawUrl !== 'string') {
+      return { safe: false, reason: 'URL cannot be empty' };
+    }
+
+    let urlToParse = rawUrl.trim();
+    if (!/^https?:\/\//i.test(urlToParse)) {
+      urlToParse = `https://${urlToParse}`;
+    }
+
+    const parsed = new URL(urlToParse);
 
     // Only allow http and https protocols
     if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {

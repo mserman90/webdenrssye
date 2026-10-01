@@ -286,6 +286,19 @@ app.get('/opml.xml', (req: Request, res: Response) => {
   res.send(opml);
 });
 
+// Any unmatched /api route must return JSON, never HTML
+app.all('/api/*', (_req: Request, res: Response) => {
+  res.status(404).json({ error: 'API endpoint not found' });
+});
+
+// Global Express error handler returning JSON
+app.use((err: unknown, _req: Request, res: Response, _next: unknown) => {
+  console.error('[API Error]:', err);
+  res.status(500).json({
+    error: err instanceof Error ? err.message : 'Internal Server Error',
+  });
+});
+
 // Start scheduler
 scheduler.start();
 

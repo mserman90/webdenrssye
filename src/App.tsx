@@ -155,6 +155,36 @@ export default function App() {
   // Notification Banner
   const [banner, setBanner] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
+  // Safe JSON fetcher that will never throw "Unexpected token < or T ... is not valid JSON"
+  const safeJsonFetch = async <T,>(
+    url: string,
+    options?: RequestInit
+  ): Promise<{ ok: boolean; status: number; data?: T; error?: string }> => {
+    try {
+      const res = await fetch(url, options);
+      const contentType = res.headers.get('content-type') || '';
+
+      if (contentType.includes('application/json')) {
+        const json = await res.json();
+        if (!res.ok) {
+          return {
+            ok: false,
+            status: res.status,
+            error: json.error || json.message || `Server error (${res.status})`,
+          };
+        }
+        return { ok: true, status: res.status, data: json as T };
+      } else {
+        const text = await res.text();
+        const cleanText = text.replace(/<[^>]*>?/gm, '').trim();
+        const msg = cleanText.slice(0, 150) || `Request failed (${res.status} ${res.statusText})`;
+        return { ok: false, status: res.status, error: msg };
+      }
+    } catch (err: unknown) {
+      return { ok: false, status: 0, error: err instanceof Error ? err.message : String(err) };
+    }
+  };
+
   const t = {
     appName: lang === 'tr' ? "Web'den RSS'ye" : "Web-to-RSS",
     appTagline: lang === 'tr' ? "Herhangi bir web sitesini canlı RSS 2.0 akışına dönüştürün" : "Turn any website into a clean, live RSS 2.0 feed",
@@ -188,9 +218,12 @@ export default function App() {
   const fetchFeeds = async () => {
     setLoadingFeeds(true);
     try {
-      const res = await fetch('/api/feeds');
-      const data = await res.json();
-      setFeeds(Array.isArray(data) ? data : []);
+      const res = await safeJsonFetch<FeedConfig[]>('/api/feeds');
+      if (res.ok && Array.isArray(res.data)) {
+        setFeeds(res.data);
+      } else {
+        setFeeds([]);
+      }
     } catch {
       showBanner('error', lang === 'tr' ? 'Akışlar yüklenemedi' : 'Failed to load feeds');
     } finally {
@@ -200,9 +233,15 @@ export default function App() {
 
   const fetchStats = async () => {
     try {
-      const res = await fetch('/api/stats');
-      const data = await res.json();
-      setStats(data);
+      const res = await safeJsonFetch<{
+        totalFeeds: number;
+        activeFeeds: number;
+        totalItems: number;
+        uptimeSeconds: number;
+      }>('/api/stats');
+      if (res.ok && res.data) {
+        setStats(res.data);
+      }
     } catch {
       // ignore
     }
@@ -224,14 +263,21 @@ export default function App() {
   const handleRefreshFeed = async (feedId: string) => {
     setRefreshingFeedId(feedId);
     try {
-      const res = await fetch(`/api/feeds/${feedId}/refresh`, { method: 'POST' });
-      const data = await res.json();
+      const res = await safeJsonFetch<{ result?: { itemCount: number }; error?: string }>(
+        `/api/feeds/${feedId}/refresh`,
+        { method: 'POST' }
+      );
       if (res.ok) {
-        showBanner('success', lang === 'tr' ? `Akış güncellendi (${data.result?.itemCount || 0} öğe)` : `Feed refreshed (${data.result?.itemCount || 0} items)`);
+        showBanner(
+          'success',
+          lang === 'tr'
+            ? `Akış güncellendi (${res.data?.result?.itemCount || 0} öğe)`
+            : `Feed refreshed (${res.data?.result?.itemCount || 0} items)`
+        );
         fetchFeeds();
         fetchStats();
       } else {
-        showBanner('error', data.error || 'Refresh failed');
+        showBanner('error', res.error || 'Refresh failed');
       }
     } catch (err: unknown) {
       showBanner('error', err instanceof Error ? err.message : 'Error refreshing feed');
@@ -245,11 +291,13 @@ export default function App() {
       return;
     }
     try {
-      const res = await fetch(`/api/feeds/${feedId}`, { method: 'DELETE' });
+      const res = await safeJsonFetch(`/api/feeds/${feedId}`, { method: 'DELETE' });
       if (res.ok) {
         showBanner('success', lang === 'tr' ? 'Akış başarıyla silindi' : 'Feed deleted successfully');
         fetchFeeds();
         fetchStats();
+      } else {
+        showBanner('error', res.error || 'Delete failed');
       }
     } catch {
       showBanner('error', 'Delete failed');
@@ -260,9 +308,12 @@ export default function App() {
     setViewingFeed(feed);
     setLoadingItems(true);
     try {
-      const res = await fetch(`/api/feeds/${feed.id}`);
-      const data = await res.json();
-      setViewingItems(data.items || []);
+      const res = await safeJsonFetch<{ feed: FeedConfig; items: FeedItem[] }>(`/api/feeds/${feed.id}`);
+      if (res.ok && res.data) {
+        setViewingItems(res.data.items || []);
+      } else {
+        setViewingItems([]);
+      }
     } catch {
       setViewingItems([]);
     } finally {
@@ -305,30 +356,47 @@ export default function App() {
     }
 
     try {
-      const res = await fetch('/api/preview', {
+      let targetUrl = feedForm.url.trim();
+      if (!/^https?:\/\//i.test(targetUrl)) {
+        targetUrl = `https://${targetUrl}`;
+      }
+
+      const res = await safeJsonFetch<{
+        success: boolean;
+        items: FeedItem[];
+        rssXml?: string;
+        durationMs: number;
+        error?: string;
+      }>('/api/preview', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          url: feedForm.url,
+          url: targetUrl,
           selectors: feedForm.selectors,
           customHeaders: headersObj,
         }),
       });
-      const data = await res.json();
-      if (res.ok && data.success) {
+
+      if (res.ok && res.data && res.data.success) {
         setPreviewResult({
-          items: data.items,
-          rssXml: data.rssXml,
-          durationMs: data.durationMs,
+          items: res.data.items,
+          rssXml: res.data.rssXml,
+          durationMs: res.data.durationMs,
         });
-        showBanner('success', lang === 'tr' ? `${data.items.length} öğe başarıyla ayrıştırıldı (${data.durationMs}ms)` : `Extracted ${data.items.length} items (${data.durationMs}ms)`);
+        showBanner(
+          'success',
+          lang === 'tr'
+            ? `${res.data.items.length} öğe başarıyla ayrıştırıldı (${res.data.durationMs}ms)`
+            : `Extracted ${res.data.items.length} items (${res.data.durationMs}ms)`
+        );
       } else {
+        const errorMsg = res.data?.error || res.error || 'Scraping error';
         setPreviewResult({
           items: [],
-          durationMs: data.durationMs || 0,
-          error: data.error || 'Scraping error',
+          durationMs: res.data?.durationMs || 0,
+          error: errorMsg,
         });
-        showBanner('error', data.error || 'Failed to extract items');
+        showBanner('error', errorMsg);
       }
     } catch (err: unknown) {
       setPreviewResult({
@@ -359,8 +427,14 @@ export default function App() {
       }
     }
 
+    let targetUrl = feedForm.url.trim();
+    if (!/^https?:\/\//i.test(targetUrl)) {
+      targetUrl = `https://${targetUrl}`;
+    }
+
     const payload = {
       ...feedForm,
+      url: targetUrl,
       customHeaders: headersObj,
     };
 
@@ -368,13 +442,12 @@ export default function App() {
       const endpoint = isEditing ? `/api/feeds/${feedForm.id}` : '/api/feeds';
       const method = isEditing ? 'PUT' : 'POST';
 
-      const res = await fetch(endpoint, {
+      const res = await safeJsonFetch(endpoint, {
         method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
 
-      const data = await res.json();
       if (res.ok) {
         showBanner('success', lang === 'tr' ? 'Akış başarıyla kaydedildi!' : 'Feed saved successfully!');
         fetchFeeds();
@@ -382,7 +455,7 @@ export default function App() {
         setActiveTab('feeds');
         setIsEditing(false);
       } else {
-        showBanner('error', data.error || 'Failed to save feed');
+        showBanner('error', res.error || 'Failed to save feed');
       }
     } catch {
       showBanner('error', 'Error saving feed');
@@ -412,18 +485,28 @@ export default function App() {
     setDiscoveryResult(null);
     setDiscoveryError(null);
 
+    let targetUrl = discoverUrl.trim();
+    if (!/^https?:\/\//i.test(targetUrl)) {
+      targetUrl = `https://${targetUrl}`;
+    }
+
     try {
-      const res = await fetch('/api/detect', {
+      const res = await safeJsonFetch<DetectionResult>('/api/detect', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: discoverUrl }),
+        body: JSON.stringify({ url: targetUrl }),
       });
-      const data = await res.json();
-      if (res.ok) {
-        setDiscoveryResult(data);
-        showBanner('success', lang === 'tr' ? `Sayfa analiz edildi! %${data.confidence} doğruluk ile ${data.itemCount} öğe tespit edildi.` : `Page analyzed! Found ${data.itemCount} items with ${data.confidence}% confidence.`);
+
+      if (res.ok && res.data) {
+        setDiscoveryResult(res.data);
+        showBanner(
+          'success',
+          lang === 'tr'
+            ? `Sayfa analiz edildi! %${res.data.confidence} doğruluk ile ${res.data.itemCount} öğe tespit edildi.`
+            : `Page analyzed! Found ${res.data.itemCount} items with ${res.data.confidence}% confidence.`
+        );
       } else {
-        setDiscoveryError(data.error || 'Discovery failed');
+        setDiscoveryError(res.error || 'Discovery failed');
       }
     } catch (err: unknown) {
       setDiscoveryError(err instanceof Error ? err.message : 'Discovery network error');

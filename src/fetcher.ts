@@ -46,6 +46,10 @@ export async function fetchWebPage(targetUrl: string, options: FetchOptions = {}
       throw new Error(`Redirected to unsafe location: ${finalCheck.reason}`);
     }
 
+    if (!response.ok) {
+      throw new Error(`Target website returned HTTP ${response.status} (${response.statusText}): ${finalUrl}`);
+    }
+
     const contentType = response.headers.get('content-type') || 'text/html';
     
     // Read response buffer to handle character encodings (e.g., ISO-8859-9 / Windows-1254 common in Turkish sites)
