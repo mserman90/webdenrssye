@@ -12,13 +12,50 @@ export function resolveUrl(relativeUrl: string, baseUrl: string): string {
   }
 }
 
+const TURKISH_MONTHS: Record<string, string> = {
+  ocak: 'January',
+  subat: 'February',
+  şubat: 'February',
+  mart: 'March',
+  nisan: 'April',
+  mayis: 'May',
+  mayıs: 'May',
+  haziran: 'June',
+  temmuz: 'July',
+  agustos: 'August',
+  ağustos: 'August',
+  eylul: 'September',
+  eylül: 'September',
+  ekim: 'October',
+  kasim: 'November',
+  kasım: 'November',
+  aralik: 'December',
+  aralık: 'December',
+};
+
 export function parseItemDate(rawDateStr: string): string {
   if (!rawDateStr) return new Date().toUTCString();
 
-  const trimmed = rawDateStr.trim();
+  const trimmed = rawDateStr.replace(/\s+/g, ' ').trim();
+
+  // Try direct parse
   const parsed = Date.parse(trimmed);
   if (!isNaN(parsed)) {
     return new Date(parsed).toUTCString();
+  }
+
+  // Check for Turkish date like "30 Eylül 2026" or "15 Mart 2025"
+  const trDateMatch = trimmed.match(/(\d{1,2})\s+([a-zA-ZçğıöşüÇĞİÖŞÜ]+)\s+(\d{4})/i);
+  if (trDateMatch) {
+    const [, day, monthTr, year] = trDateMatch;
+    const engMonth = TURKISH_MONTHS[monthTr.toLowerCase()];
+    if (engMonth) {
+      const engDateStr = `${day} ${engMonth} ${year}`;
+      const trParsed = Date.parse(engDateStr);
+      if (!isNaN(trParsed)) {
+        return new Date(trParsed).toUTCString();
+      }
+    }
   }
 
   // Common relative formats like "3 hours ago", "5 days ago", "2 gün önce", "1 saat önce"
@@ -74,10 +111,29 @@ export function extractItemsFromHtml(
     let rawLink = '';
     if (selectors.link) {
       const $link = $item.find(selectors.link);
-      rawLink = $link.attr('href') || '';
-    } else {
-      rawLink = $item.find('a[href]').first().attr('href') || '';
+      $link.each((_, el) => {
+        const h = $(el).attr('href');
+        if (h && h !== '#' && !h.startsWith('javascript:')) {
+          rawLink = h;
+          return false;
+        }
+      });
+      if (!rawLink) {
+        rawLink = $link.first().attr('href') || '';
+      }
     }
+    
+    // If link is still '#' or empty, find any valid non-# link in container
+    if (!rawLink || rawLink === '#' || rawLink.startsWith('javascript:')) {
+      $item.find('a[href]').each((_, el) => {
+        const h = $(el).attr('href');
+        if (h && h !== '#' && !h.startsWith('javascript:') && !h.startsWith('mailto:')) {
+          rawLink = h;
+          return false;
+        }
+      });
+    }
+
     const link = resolveUrl(rawLink, baseUrl);
 
     // Skip items without title or valid link
@@ -195,6 +251,7 @@ export function autoDetectSelectors(html: string, baseUrl: string): DetectionRes
   const pageTitle = $('title').text().trim() || $('h1').first().text().trim() || 'Feed';
 
   const candidateContainers = [
+    '.arsivdt-container',
     'tr.athing',
     'table.itemlist tr.athing',
     'article',
@@ -207,6 +264,7 @@ export function autoDetectSelectors(html: string, baseUrl: string): DetectionRes
     '.feed-item',
     '.blog-post',
     'li.post',
+    'div[class*="arsiv"]',
     'div[class*="post"]',
     'div[class*="article"]',
     'div[class*="item"]',
@@ -274,7 +332,10 @@ export function autoDetectSelectors(html: string, baseUrl: string): DetectionRes
   let imageSelector = 'img';
 
   if ($sampleContainer.length) {
-    if ($sampleContainer.find('.titleline a').length) {
+    if ($sampleContainer.find('h4.card-title a').length) {
+      titleSelector = 'h4.card-title a';
+      linkSelector = 'h4.card-title a';
+    } else if ($sampleContainer.find('.titleline a').length) {
       titleSelector = '.titleline a';
       linkSelector = '.titleline a';
     } else if ($sampleContainer.find('h2 a').length) {
@@ -283,10 +344,15 @@ export function autoDetectSelectors(html: string, baseUrl: string): DetectionRes
     } else if ($sampleContainer.find('h3 a').length) {
       titleSelector = 'h3 a';
       linkSelector = 'h3 a';
+    } else if ($sampleContainer.find('h4 a').length) {
+      titleSelector = 'h4 a';
+      linkSelector = 'h4 a';
     } else if ($sampleContainer.find('h2').length) {
       titleSelector = 'h2';
     } else if ($sampleContainer.find('h3').length) {
       titleSelector = 'h3';
+    } else if ($sampleContainer.find('h4').length) {
+      titleSelector = 'h4';
     }
 
     if ($sampleContainer.find('.date, .time, time').length) {

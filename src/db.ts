@@ -13,6 +13,26 @@ class MemoryDatabase {
   private seedDefaultFeeds() {
     const seedFeeds: FeedConfig[] = [
       {
+        id: 'tarim-orman-sygm',
+        name: 'T.C. Tarım ve Orman Bakanlığı (SYGM Haber Arşivi)',
+        description: 'Su Yönetimi Genel Müdürlüğü güncel haber ve duyuruları',
+        url: 'https://www.tarimorman.gov.tr/SYGM/HaberArsivi',
+        selectors: {
+          itemContainer: '.arsivdt-container',
+          title: 'h4.card-title a',
+          link: 'h4.card-title a',
+          date: '.post_details',
+          image: 'img.card-img-top',
+          author: '',
+          description: '',
+        },
+        refreshIntervalMinutes: 60,
+        isActive: true,
+        itemCount: 0,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+      {
         id: 'hacker-news',
         name: 'Hacker News Frontpage',
         description: 'Hacker News top stories scraped directly into RSS 2.0',

@@ -36,6 +36,20 @@ import type { FeedConfig, FeedItem, SelectorConfig, DetectionResult } from './ty
 // Pre-configured templates for common website types
 const PRESETS = [
   {
+    name: 'T.C. Tarım ve Orman Bakanlığı (SYGM Haber Arşivi)',
+    url: 'https://www.tarimorman.gov.tr/SYGM/HaberArsivi',
+    selectors: {
+      itemContainer: '.arsivdt-container',
+      title: 'h4.card-title a',
+      link: 'h4.card-title a',
+      description: '',
+      date: '.post_details',
+      author: 'Su Yönetimi Genel Müdürlüğü',
+      image: 'img.card-img-top',
+    },
+    interval: 60,
+  },
+  {
     name: 'Hacker News (Y Combinator)',
     url: 'https://news.ycombinator.com',
     selectors: {
