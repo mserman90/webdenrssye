@@ -50,32 +50,6 @@ const PRESETS = [
     interval: 60,
   },
   {
-    name: 'Hacker News (Y Combinator)',
-    url: 'https://news.ycombinator.com',
-    selectors: {
-      itemContainer: 'table.itemlist tr.athing',
-      title: '.titleline > a',
-      link: '.titleline > a',
-      description: '',
-      date: '',
-      author: '',
-    },
-    interval: 30,
-  },
-  {
-    name: 'GitHub Blog & Changelog',
-    url: 'https://github.blog',
-    selectors: {
-      itemContainer: 'article.post-item, .grid-cols-1 article, article',
-      title: 'h3, h2',
-      link: 'a[href*="/20"]',
-      description: 'p',
-      date: 'time',
-      image: 'img',
-    },
-    interval: 60,
-  },
-  {
     name: 'Genel Blog & Haber (Generic Article)',
     url: 'https://example.com/blog',
     selectors: {
@@ -1566,25 +1540,60 @@ export default function App() {
             <div className="border border-neutral-800 bg-neutral-900/60 rounded-2xl p-6 space-y-4">
               <h3 className="text-base font-bold text-white flex items-center gap-2">
                 <Rss className="w-5 h-5 text-orange-400" />
-                <span>{lang === 'tr' ? 'RSS Okuyucularına Ekleme' : 'Subscribing in RSS Readers'}</span>
+                <span>{lang === 'tr' ? 'İnoreader, Feedly ve Harici Okuyucu Entegrasyonu' : 'Inoreader, Feedly & External Readers Integration'}</span>
               </h3>
-              <p className="text-xs text-neutral-400">
-                {lang === 'tr'
-                  ? 'Oluşturduğunuz akışın XML bağlantısını kopyalayın ve favori RSS uygulamanıza yapıştırın:'
-                  : 'Copy the generated XML feed URL and paste it into your favorite RSS app:'}
-              </p>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs text-neutral-300">
-                <div className="p-3 rounded-lg bg-neutral-950 border border-neutral-800 font-medium text-center">
-                  Feedly
+              
+              <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-200 leading-relaxed space-y-2">
+                <div className="font-semibold text-amber-400 flex items-center gap-1.5">
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  <span>
+                    {lang === 'tr'
+                      ? 'Neden Inoreader "We couldn\'t find any feeds" hatası veriyor?'
+                      : 'Why does Inoreader report "We couldn\'t find any feeds"?'}
+                  </span>
                 </div>
-                <div className="p-3 rounded-lg bg-neutral-950 border border-neutral-800 font-medium text-center">
-                  Inoreader
+                <p>
+                  {lang === 'tr'
+                    ? 'AI Studio üzerindeki "ais-dev-*.run.app" geliştirme adresleri, Google hesabınızla korunan güvenli özel bir geliştirici ortamıdır. Inoreader veya Feedly gibi harici bulut sunucuları Google oturumunuza sahip olmadığı için bu adrese doğrudan erişemez ve giriş sayfasına yönlendirilir.'
+                    : 'The "ais-dev-*.run.app" development domain is protected by Google account authentication. External cloud crawlers (Inoreader, Feedly) cannot access private development links without Google login cookies.'}
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs text-neutral-300">
+                <div className="p-4 rounded-xl bg-neutral-950 border border-neutral-800 space-y-2">
+                  <div className="font-bold text-neutral-100 flex items-center gap-1.5">
+                    <span className="w-5 h-5 rounded-full bg-amber-500/20 text-amber-400 flex items-center justify-center text-[10px]">1</span>
+                    <span>{lang === 'tr' ? 'OPML İle İçe Aktarma' : 'OPML File Import'}</span>
+                  </div>
+                  <p className="text-neutral-400 text-[11px]">
+                    {lang === 'tr'
+                      ? 'Üst sağdaki "OPML İndir" butonuna tıklayın. Inoreader\'da Tercihler > Abonelikler > "OPML İçe Aktar" alanına yükleyerek akışları anında ekleyin.'
+                      : 'Click "Export OPML" at the top. In Inoreader, go to Preferences > Subscriptions > "Import OPML" to load your feeds.'}
+                  </p>
                 </div>
-                <div className="p-3 rounded-lg bg-neutral-950 border border-neutral-800 font-medium text-center">
-                  NetNewsWire
+
+                <div className="p-4 rounded-xl bg-neutral-950 border border-neutral-800 space-y-2">
+                  <div className="font-bold text-neutral-100 flex items-center gap-1.5">
+                    <span className="w-5 h-5 rounded-full bg-amber-500/20 text-amber-400 flex items-center justify-center text-[10px]">2</span>
+                    <span>{lang === 'tr' ? 'Genel Dağıtım (Vercel/Render)' : 'Public Deploy (Vercel)'}</span>
+                  </div>
+                  <p className="text-neutral-400 text-[11px]">
+                    {lang === 'tr'
+                      ? 'Projeyi Vercel veya Render gibi platformlara tek tıkla yayınlayarak Inoreader\'ın 7/24 erişebileceği genel bir URL (örn: https://sizin-app.vercel.app/rss/...) elde edin.'
+                      : 'Deploy this project to Vercel or Render. Inoreader will be able to crawl your public feed URL 24/7 without authentication.'}
+                  </p>
                 </div>
-                <div className="p-3 rounded-lg bg-neutral-950 border border-neutral-800 font-medium text-center">
-                  Apple Shortcuts
+
+                <div className="p-4 rounded-xl bg-neutral-950 border border-neutral-800 space-y-2">
+                  <div className="font-bold text-neutral-100 flex items-center gap-1.5">
+                    <span className="w-5 h-5 rounded-full bg-amber-500/20 text-amber-400 flex items-center justify-center text-[10px]">3</span>
+                    <span>{lang === 'tr' ? 'Yerel / Eklenti Okuyucular' : 'Browser RSS Extensions'}</span>
+                  </div>
+                  <p className="text-neutral-400 text-[11px]">
+                    {lang === 'tr'
+                      ? 'Feedbro (Chrome/Edge eklentisi) veya NetNewsWire gibi doğrudan tarayıcınızdan çalışan okuyucular, oturumunuz açık olduğu için bu bağlantıyı sorunsuz çeker.'
+                      : 'Extensions like Feedbro or native readers like NetNewsWire fetch directly through your authenticated browser session.'}
+                  </p>
                 </div>
               </div>
             </div>

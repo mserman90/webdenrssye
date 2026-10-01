@@ -32,43 +32,6 @@ class MemoryDatabase {
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       },
-      {
-        id: 'hacker-news',
-        name: 'Hacker News Frontpage',
-        description: 'Hacker News top stories scraped directly into RSS 2.0',
-        url: 'https://news.ycombinator.com',
-        selectors: {
-          itemContainer: 'table.itemlist tr.athing',
-          title: '.titleline > a',
-          link: '.titleline > a',
-          date: '',
-          description: '',
-        },
-        refreshIntervalMinutes: 30,
-        isActive: true,
-        itemCount: 0,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      },
-      {
-        id: 'github-blog',
-        name: 'GitHub Engineering & Changelog',
-        description: 'Latest engineering posts and product updates from GitHub Blog',
-        url: 'https://github.blog',
-        selectors: {
-          itemContainer: 'article.post-item, .grid-cols-1 article, article',
-          title: 'h3, h2',
-          link: 'a[href*="/20"]',
-          description: 'p',
-          date: 'time',
-          image: 'img',
-        },
-        refreshIntervalMinutes: 60,
-        isActive: true,
-        itemCount: 0,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      },
     ];
 
     for (const feed of seedFeeds) {

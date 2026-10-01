@@ -23,7 +23,7 @@ export function isSafeUrl(rawUrl: string): { safe: boolean; reason?: string; url
     }
 
     let urlToParse = rawUrl.trim();
-    if (!/^https?:\/\//i.test(urlToParse)) {
+    if (!/^[a-zA-Z][a-zA-Z0-9+.-]*:/i.test(urlToParse)) {
       urlToParse = `https://${urlToParse}`;
     }
 
