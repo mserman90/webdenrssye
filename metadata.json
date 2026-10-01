@@ -1,0 +1,6 @@
+{
+  "name": "Web'den RSS'ye - Web to RSS Feed Generator",
+  "description": "Modern web scraper and RSS 2.0 feed generator. Convert any website, news page, or blog into custom live RSS feeds with CSS selector extraction and scheduling.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
