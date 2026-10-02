@@ -29,8 +29,13 @@ export function generateRss20Xml(feed: FeedConfig, items: FeedItem[], selfUrl?: 
       const itemLink = escapeXml(item.link);
       const itemDesc = item.description ? `<description><![CDATA[${item.description}]]></description>` : '';
       const itemPubDate = formatRfc822Date(item.pubDate);
-      const itemGuid = escapeXml(item.guid || item.link);
-      const itemAuthor = item.author ? `<author>${escapeXml(item.author)}</author>` : '';
+      const rawGuid = item.guid || item.link;
+      const isPermaLink = /^https?:\/\//i.test(rawGuid);
+      const itemGuid = `<guid isPermaLink="${isPermaLink}">${escapeXml(rawGuid)}</guid>`;
+      
+      const authorStr = item.author ? escapeXml(item.author) : '';
+      const itemCreator = authorStr ? `<dc:creator>${authorStr}</dc:creator>` : '';
+      const itemAuthor = authorStr.includes('@') ? `<author>${authorStr}</author>` : '';
       const itemCategory = item.category ? `<category>${escapeXml(item.category)}</category>` : '';
       
       let enclosureTag = '';
@@ -41,8 +46,9 @@ export function generateRss20Xml(feed: FeedConfig, items: FeedItem[], selfUrl?: 
       return `    <item>
       <title>${itemTitle}</title>
       <link>${itemLink}</link>
-      <guid isPermaLink="true">${itemGuid}</guid>
+      ${itemGuid}
       <pubDate>${itemPubDate}</pubDate>
+      ${itemCreator}
       ${itemAuthor}
       ${itemCategory}
       ${itemDesc}
@@ -56,7 +62,7 @@ export function generateRss20Xml(feed: FeedConfig, items: FeedItem[], selfUrl?: 
     : '';
 
   return `<?xml version="1.0" encoding="UTF-8"?>
-<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/">
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:content="http://purl.org/rss/1.0/modules/content/">
   <channel>
     <title>${channelTitle}</title>
     <link>${channelLink}</link>

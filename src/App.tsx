@@ -29,9 +29,12 @@ import {
   Calendar,
   User,
   Radio,
-  Share2
+  Share2,
+  Menu,
+  ChevronDown
 } from 'lucide-react';
 import type { FeedConfig, FeedItem, SelectorConfig, DetectionResult } from './types.ts';
+import { PWAInstallButton } from './PWAInstallBanner.tsx';
 
 // Pre-configured templates for common website types
 const PRESETS = [
@@ -142,6 +145,10 @@ export default function App() {
 
   // Notification Banner
   const [banner, setBanner] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+
+  // Responsive UI States
+  const [showPresetsDropdown, setShowPresetsDropdown] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   // Safe JSON fetcher that will never throw "Unexpected token < or T ... is not valid JSON"
   const safeJsonFetch = async <T,>(
@@ -529,41 +536,50 @@ export default function App() {
       {/* Toast Notification */}
       {banner && (
         <div
-          className={`fixed bottom-6 right-6 z-50 px-4 py-3 rounded-lg shadow-xl text-sm font-medium flex items-center gap-3 border transition-all ${
+          className={`fixed bottom-4 left-4 right-4 sm:left-auto sm:right-6 sm:bottom-6 sm:max-w-md z-50 px-4 py-3 rounded-xl shadow-2xl text-sm font-medium flex items-center justify-between gap-3 border transition-all ${
             banner.type === 'success'
-              ? 'bg-emerald-950/90 text-emerald-200 border-emerald-700/60 shadow-emerald-950/40'
-              : 'bg-rose-950/90 text-rose-200 border-rose-700/60 shadow-rose-950/40'
+              ? 'bg-emerald-950/95 text-emerald-200 border-emerald-700/60 shadow-emerald-950/50'
+              : 'bg-rose-950/95 text-rose-200 border-rose-700/60 shadow-rose-950/50'
           }`}
         >
-          {banner.type === 'success' ? (
-            <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
-          ) : (
-            <AlertCircle className="w-5 h-5 text-rose-400 shrink-0" />
-          )}
-          <span>{banner.message}</span>
+          <div className="flex items-center gap-2.5 min-w-0">
+            {banner.type === 'success' ? (
+              <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+            ) : (
+              <AlertCircle className="w-5 h-5 text-rose-400 shrink-0" />
+            )}
+            <span className="truncate">{banner.message}</span>
+          </div>
+          <button
+            onClick={() => setBanner(null)}
+            className="p-1 rounded-md hover:bg-black/20 text-current opacity-70 hover:opacity-100 transition shrink-0"
+          >
+            <X className="w-4 h-4" />
+          </button>
         </div>
       )}
 
       {/* Header */}
-      <header className="border-b border-neutral-800 bg-neutral-900/80 backdrop-blur sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-amber-500 to-orange-500 flex items-center justify-center text-neutral-950 shadow-md shadow-amber-500/20">
-              <Rss className="w-5 h-5" />
+      <header className="border-b border-neutral-800 bg-neutral-900/90 backdrop-blur sticky top-0 z-40">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-2 sm:gap-4">
+          {/* Logo & Branding */}
+          <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-tr from-amber-500 to-orange-500 flex items-center justify-center text-neutral-950 shadow-md shadow-amber-500/20 shrink-0">
+              <Rss className="w-4 h-4 sm:w-5 sm:h-5" />
             </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="font-bold text-lg tracking-tight text-white">{t.appName}</h1>
-                <span className="text-[10px] uppercase font-semibold px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20">
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5 sm:gap-2">
+                <h1 className="font-bold text-base sm:text-lg tracking-tight text-white truncate">{t.appName}</h1>
+                <span className="text-[10px] uppercase font-semibold px-1.5 sm:px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20 shrink-0">
                   RSS 2.0
                 </span>
               </div>
-              <p className="text-xs text-neutral-400 hidden sm:block">{t.appTagline}</p>
+              <p className="text-[11px] text-neutral-400 hidden md:block truncate">{t.appTagline}</p>
             </div>
           </div>
 
-          {/* Quick Metrics Bar */}
-          <div className="hidden lg:flex items-center gap-4 text-xs font-mono text-neutral-400">
+          {/* Quick Metrics Bar (Desktop) */}
+          <div className="hidden lg:flex items-center gap-3 text-xs font-mono text-neutral-400">
             <div className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-neutral-800/60 border border-neutral-800">
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
               <span>{t.statusHealthy}</span>
@@ -579,15 +595,18 @@ export default function App() {
           </div>
 
           {/* Right Header Actions */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 sm:gap-2">
+            <PWAInstallButton lang={lang} />
+
             <a
               href="/opml.xml"
               download="webdenrssye-feeds.opml"
               title={t.exportOpml}
-              className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-neutral-800 hover:bg-neutral-700 text-neutral-300 border border-neutral-700/60 transition"
+              className="hidden sm:inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-medium bg-neutral-800 hover:bg-neutral-700 text-neutral-300 border border-neutral-700/60 transition"
             >
               <Download className="w-3.5 h-3.5" />
-              <span>{t.exportOpml}</span>
+              <span className="hidden md:inline">{t.exportOpml}</span>
+              <span className="md:hidden">OPML</span>
             </a>
 
             <button
@@ -617,9 +636,9 @@ export default function App() {
                 });
                 setActiveTab('wizard');
               }}
-              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-amber-500 hover:bg-amber-400 text-neutral-950 transition shadow-sm"
+              className="inline-flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-amber-500 hover:bg-amber-400 text-neutral-950 transition shadow-sm"
             >
-              <Plus className="w-4 h-4" />
+              <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
               <span>{t.newFeed}</span>
             </button>
 
@@ -627,65 +646,113 @@ export default function App() {
             <button
               onClick={() => setLang(lang === 'tr' ? 'en' : 'tr')}
               className="px-2 py-1.5 rounded-lg text-xs font-semibold bg-neutral-800 hover:bg-neutral-700 text-neutral-300 border border-neutral-700/60 transition"
+              title="Change Language"
             >
               {lang === 'tr' ? 'EN' : 'TR'}
+            </button>
+
+            {/* Mobile Menu Toggle Button */}
+            <button
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              className="lg:hidden p-1.5 rounded-lg text-neutral-400 hover:text-white bg-neutral-800 hover:bg-neutral-700 border border-neutral-700/60 transition"
+              aria-label="Toggle Mobile Menu"
+            >
+              {mobileMenuOpen ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
             </button>
           </div>
         </div>
 
-        {/* Tab Navigation */}
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 flex gap-6 text-sm font-medium border-t border-neutral-800/80">
+        {/* Mobile Info & Menu Dropdown Drawer */}
+        {mobileMenuOpen && (
+          <div className="lg:hidden border-t border-neutral-800 bg-neutral-900/95 px-4 py-3 space-y-3">
+            <div className="flex items-center justify-between text-xs font-mono text-neutral-400 pb-2 border-b border-neutral-800">
+              <div className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                <span className="text-neutral-300">{t.statusHealthy}</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <span>{stats?.activeFeeds ?? feeds.length} {lang === 'tr' ? 'Akış' : 'Feeds'}</span>
+                <span>&bull;</span>
+                <span>{stats?.totalItems ?? 0} {lang === 'tr' ? 'Öğe' : 'Items'}</span>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 pt-1">
+              <PWAInstallButton lang={lang} />
+              <a
+                href="/opml.xml"
+                download="webdenrssye-feeds.opml"
+                className="flex-1 py-2 px-3 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-neutral-200 text-xs font-medium flex items-center justify-center gap-2 border border-neutral-700/70"
+              >
+                <Download className="w-3.5 h-3.5 text-amber-400" />
+                <span>{t.exportOpml}</span>
+              </a>
+              <a
+                href="/api/health"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="py-2 px-3 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-neutral-400 text-xs font-mono flex items-center justify-center gap-1.5 border border-neutral-700/70"
+              >
+                <span>/api/health</span>
+                <ExternalLink className="w-3 h-3" />
+              </a>
+            </div>
+          </div>
+        )}
+
+        {/* Responsive Horizontal Tab Navigation */}
+        <nav className="max-w-7xl mx-auto px-4 sm:px-6 flex items-center overflow-x-auto scrollbar-none border-t border-neutral-800/80 gap-1 sm:gap-6 text-xs sm:text-sm font-medium">
           <button
             onClick={() => setActiveTab('feeds')}
-            className={`py-3 flex items-center gap-2 border-b-2 transition ${
+            className={`py-3 px-2 sm:px-0 flex items-center gap-1.5 sm:gap-2 border-b-2 shrink-0 transition min-h-[44px] ${
               activeTab === 'feeds'
                 ? 'border-amber-500 text-amber-400'
                 : 'border-transparent text-neutral-400 hover:text-neutral-200'
             }`}
           >
-            <Radio className="w-4 h-4" />
-            <span>{t.tabFeeds}</span>
-            <span className="text-[11px] px-1.5 py-0.2 rounded-full bg-neutral-800 text-neutral-400">
+            <Radio className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
+            <span className="whitespace-nowrap">{t.tabFeeds}</span>
+            <span className="text-[10px] sm:text-[11px] px-1.5 py-0.2 rounded-full bg-neutral-800 text-neutral-400">
               {feeds.length}
             </span>
           </button>
 
           <button
             onClick={() => setActiveTab('wizard')}
-            className={`py-3 flex items-center gap-2 border-b-2 transition ${
+            className={`py-3 px-2 sm:px-0 flex items-center gap-1.5 sm:gap-2 border-b-2 shrink-0 transition min-h-[44px] ${
               activeTab === 'wizard'
                 ? 'border-amber-500 text-amber-400'
                 : 'border-transparent text-neutral-400 hover:text-neutral-200'
             }`}
           >
-            <Code className="w-4 h-4" />
-            <span>{isEditing ? (lang === 'tr' ? 'Akışı Düzenle' : 'Edit Feed') : t.tabWizard}</span>
+            <Code className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
+            <span className="whitespace-nowrap">{isEditing ? (lang === 'tr' ? 'Akışı Düzenle' : 'Edit Feed') : t.tabWizard}</span>
           </button>
 
           <button
             onClick={() => setActiveTab('discover')}
-            className={`py-3 flex items-center gap-2 border-b-2 transition ${
+            className={`py-3 px-2 sm:px-0 flex items-center gap-1.5 sm:gap-2 border-b-2 shrink-0 transition min-h-[44px] ${
               activeTab === 'discover'
                 ? 'border-amber-500 text-amber-400'
                 : 'border-transparent text-neutral-400 hover:text-neutral-200'
             }`}
           >
-            <Sparkles className="w-4 h-4" />
-            <span>{t.tabDiscover}</span>
+            <Sparkles className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
+            <span className="whitespace-nowrap">{t.tabDiscover}</span>
           </button>
 
           <button
             onClick={() => setActiveTab('docs')}
-            className={`py-3 flex items-center gap-2 border-b-2 transition ${
+            className={`py-3 px-2 sm:px-0 flex items-center gap-1.5 sm:gap-2 border-b-2 shrink-0 transition min-h-[44px] ${
               activeTab === 'docs'
                 ? 'border-amber-500 text-amber-400'
                 : 'border-transparent text-neutral-400 hover:text-neutral-200'
             }`}
           >
-            <BookOpen className="w-4 h-4" />
-            <span>{t.tabDocs}</span>
+            <BookOpen className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
+            <span className="whitespace-nowrap">{t.tabDocs}</span>
           </button>
-        </div>
+        </nav>
       </header>
 
       {/* Main Container */}
@@ -822,21 +889,21 @@ export default function App() {
                             type="text"
                             readOnly
                             value={rssUrl}
-                            className="bg-transparent text-[11px] font-mono text-neutral-400 px-2 flex-1 outline-none truncate"
+                            className="bg-transparent text-[11px] font-mono text-neutral-400 px-2 flex-1 outline-none truncate select-all min-w-0"
                           />
                           <button
                             onClick={() => handleCopyRss(feed.id)}
-                            className="px-2 py-1 rounded bg-neutral-800 hover:bg-neutral-700 text-neutral-200 text-xs font-medium flex items-center gap-1 transition"
+                            className="px-2.5 py-1.5 rounded-md bg-neutral-800 hover:bg-neutral-700 text-neutral-200 text-xs font-medium flex items-center gap-1 transition shrink-0 active:scale-95"
                             title={t.copyRssUrl}
                           >
                             {copiedId === feed.id ? (
                               <>
-                                <Check className="w-3 h-3 text-emerald-400" />
+                                <Check className="w-3.5 h-3.5 text-emerald-400" />
                                 <span className="text-emerald-400 text-[10px]">{t.copied}</span>
                               </>
                             ) : (
                               <>
-                                <Copy className="w-3 h-3" />
+                                <Copy className="w-3.5 h-3.5" />
                                 <span className="text-[10px]">XML</span>
                               </>
                             )}
@@ -845,7 +912,7 @@ export default function App() {
                             href={`/rss/${feed.id}.xml`}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="p-1 rounded hover:bg-neutral-800 text-neutral-400 hover:text-neutral-200 transition"
+                            className="p-1.5 rounded-md hover:bg-neutral-800 text-neutral-400 hover:text-neutral-200 transition shrink-0 flex items-center justify-center"
                             title="Open raw XML"
                           >
                             <ExternalLink className="w-3.5 h-3.5" />
@@ -853,20 +920,21 @@ export default function App() {
                         </div>
 
                         {/* Bottom Row Actions */}
-                        <div className="flex items-center justify-between gap-1 pt-1 text-xs">
-                          <div className="flex items-center gap-1">
+                        <div className="flex items-center justify-between gap-2 pt-1 text-xs">
+                          <div className="flex items-center gap-1.5">
                             <button
                               onClick={() => handleOpenReader(feed)}
-                              className="px-2.5 py-1.5 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-neutral-200 flex items-center gap-1 transition font-medium"
+                              className="px-3 py-1.5 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-neutral-200 flex items-center gap-1.5 transition font-medium min-h-[36px] active:scale-95"
                             >
-                              <Eye className="w-3.5 h-3.5 text-amber-400" />
-                              <span>{t.viewArticles}</span>
+                              <Eye className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                              <span className="truncate">{t.viewArticles}</span>
                             </button>
                             <button
                               onClick={() => handleRefreshFeed(feed.id)}
                               disabled={isRefreshing}
-                              className="p-1.5 rounded-lg hover:bg-neutral-800 text-neutral-400 hover:text-neutral-200 transition disabled:opacity-50"
+                              className="w-9 h-9 rounded-lg hover:bg-neutral-800 text-neutral-400 hover:text-neutral-200 transition disabled:opacity-50 flex items-center justify-center shrink-0"
                               title={t.refreshNow}
+                              aria-label={t.refreshNow}
                             >
                               <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin text-amber-400' : ''}`} />
                             </button>
@@ -875,15 +943,17 @@ export default function App() {
                           <div className="flex items-center gap-1">
                             <button
                               onClick={() => handleEditClick(feed)}
-                              className="p-1.5 rounded-lg hover:bg-neutral-800 text-neutral-400 hover:text-neutral-200 transition"
+                              className="w-9 h-9 rounded-lg hover:bg-neutral-800 text-neutral-400 hover:text-neutral-200 transition flex items-center justify-center shrink-0"
                               title={t.editFeed}
+                              aria-label={t.editFeed}
                             >
                               <Edit3 className="w-3.5 h-3.5" />
                             </button>
                             <button
                               onClick={() => handleDeleteFeed(feed.id)}
-                              className="p-1.5 rounded-lg hover:bg-rose-950/60 text-neutral-400 hover:text-rose-400 transition"
+                              className="w-9 h-9 rounded-lg hover:bg-rose-950/60 text-neutral-400 hover:text-rose-400 transition flex items-center justify-center shrink-0"
                               title={t.deleteFeed}
+                              aria-label={t.deleteFeed}
                             >
                               <Trash2 className="w-3.5 h-3.5" />
                             </button>
@@ -919,30 +989,44 @@ export default function App() {
                   </div>
 
                   {/* Preset Selector */}
-                  <div className="relative group">
+                  <div className="relative">
                     <button
                       type="button"
-                      className="px-3 py-1.5 rounded-lg text-xs font-medium bg-neutral-800 hover:bg-neutral-700 text-amber-400 border border-neutral-700 flex items-center gap-1.5 transition"
+                      onClick={() => setShowPresetsDropdown(!showPresetsDropdown)}
+                      className="px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-medium bg-neutral-800 hover:bg-neutral-700 text-amber-400 border border-neutral-700 flex items-center gap-1.5 transition active:scale-95 shrink-0"
                     >
                       <Layers className="w-3.5 h-3.5" />
                       <span>{lang === 'tr' ? 'Hazır Şablonlar' : 'Presets'}</span>
+                      <ChevronDown className={`w-3 h-3 text-neutral-400 transition-transform ${showPresetsDropdown ? 'rotate-180' : ''}`} />
                     </button>
-                    <div className="absolute right-0 top-full mt-2 w-64 bg-neutral-900 border border-neutral-800 rounded-xl shadow-2xl p-2 hidden group-hover:block group-focus-within:block z-30">
-                      <div className="text-[10px] font-semibold text-neutral-500 px-2 py-1 uppercase">
-                        {lang === 'tr' ? 'Popüler Siteler' : 'Popular Sites'}
-                      </div>
-                      {PRESETS.map((p) => (
-                        <button
-                          key={p.name}
-                          type="button"
-                          onClick={() => handleApplyPreset(p)}
-                          className="w-full text-left px-2.5 py-2 rounded-lg text-xs text-neutral-200 hover:bg-neutral-800 hover:text-amber-400 transition"
-                        >
-                          <div className="font-medium">{p.name}</div>
-                          <div className="text-[10px] font-mono text-neutral-500 truncate">{p.url}</div>
-                        </button>
-                      ))}
-                    </div>
+
+                    {showPresetsDropdown && (
+                      <>
+                        <div
+                          className="fixed inset-0 z-30"
+                          onClick={() => setShowPresetsDropdown(false)}
+                        />
+                        <div className="absolute right-0 top-full mt-2 w-72 sm:w-80 bg-neutral-900 border border-neutral-800 rounded-xl shadow-2xl p-2 z-40 max-h-80 overflow-y-auto">
+                          <div className="text-[10px] font-semibold text-neutral-500 px-2 py-1 uppercase">
+                            {lang === 'tr' ? 'Popüler Siteler' : 'Popular Sites'}
+                          </div>
+                          {PRESETS.map((p) => (
+                            <button
+                              key={p.name}
+                              type="button"
+                              onClick={() => {
+                                handleApplyPreset(p);
+                                setShowPresetsDropdown(false);
+                              }}
+                              className="w-full text-left px-2.5 py-2 rounded-lg text-xs text-neutral-200 hover:bg-neutral-800 hover:text-amber-400 transition"
+                            >
+                              <div className="font-medium text-neutral-100">{p.name}</div>
+                              <div className="text-[10px] font-mono text-neutral-500 truncate">{p.url}</div>
+                            </button>
+                          ))}
+                        </div>
+                      </>
+                    )}
                   </div>
                 </div>
 
@@ -1192,12 +1276,12 @@ export default function App() {
                   </div>
 
                   {/* Actions: Test Preview & Save */}
-                  <div className="pt-3 flex items-center justify-between gap-3 border-t border-neutral-800">
+                  <div className="pt-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3 border-t border-neutral-800">
                     <button
                       type="button"
                       onClick={handleTestPreview}
                       disabled={testingPreview}
-                      className="px-4 py-2 rounded-xl text-xs font-semibold bg-neutral-800 hover:bg-neutral-700 text-neutral-200 border border-neutral-700/80 flex items-center gap-2 transition disabled:opacity-50"
+                      className="w-full sm:w-auto px-4 py-2.5 rounded-xl text-xs font-semibold bg-neutral-800 hover:bg-neutral-700 text-neutral-200 border border-neutral-700/80 flex items-center justify-center gap-2 transition disabled:opacity-50 min-h-[42px] active:scale-95"
                     >
                       <Play className={`w-3.5 h-3.5 ${testingPreview ? 'animate-spin' : ''}`} />
                       <span>
@@ -1209,7 +1293,7 @@ export default function App() {
 
                     <button
                       type="submit"
-                      className="px-5 py-2 rounded-xl text-xs font-bold bg-amber-500 hover:bg-amber-400 text-neutral-950 shadow-md shadow-amber-500/20 transition flex items-center gap-1.5"
+                      className="w-full sm:w-auto px-5 py-2.5 rounded-xl text-xs font-bold bg-amber-500 hover:bg-amber-400 text-neutral-950 shadow-md shadow-amber-500/20 transition flex items-center justify-center gap-1.5 min-h-[42px] active:scale-95"
                     >
                       <Check className="w-4 h-4" />
                       <span>{isEditing ? (lang === 'tr' ? 'Değişiklikleri Kaydet' : 'Update Feed') : (lang === 'tr' ? 'Akışı Oluştur ve Başlat' : 'Create & Activate')}</span>
@@ -1221,7 +1305,7 @@ export default function App() {
 
             {/* Right Preview Panel: 5 cols */}
             <div className="lg:col-span-5 space-y-4">
-              <div className="border border-neutral-800 bg-neutral-900/60 rounded-2xl p-5 sticky top-24">
+              <div className="border border-neutral-800 bg-neutral-900/60 rounded-2xl p-4 sm:p-5 static lg:sticky lg:top-24">
                 <div className="flex items-center justify-between pb-3 border-b border-neutral-800">
                   <div className="flex items-center gap-2">
                     <Eye className="w-4 h-4 text-amber-400" />
@@ -1672,14 +1756,14 @@ export default function App() {
 
       {/* Article Reader Modal */}
       {viewingFeed && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-neutral-900 border border-neutral-800 rounded-2xl w-full max-w-3xl max-h-[85vh] flex flex-col shadow-2xl">
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4">
+          <div className="bg-neutral-900 border-t sm:border border-neutral-800 rounded-t-2xl sm:rounded-2xl w-full sm:max-w-3xl h-[92vh] sm:h-auto sm:max-h-[85vh] flex flex-col shadow-2xl overflow-hidden">
             {/* Modal Header */}
-            <div className="p-5 border-b border-neutral-800 flex items-center justify-between gap-4">
-              <div>
+            <div className="p-4 sm:p-5 border-b border-neutral-800 flex items-center justify-between gap-2 sm:gap-4 shrink-0">
+              <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
-                  <h3 className="font-bold text-lg text-white">{viewingFeed.name}</h3>
-                  <span className="text-[11px] font-mono text-neutral-400">
+                  <h3 className="font-bold text-base sm:text-lg text-white truncate">{viewingFeed.name}</h3>
+                  <span className="text-[11px] font-mono text-neutral-400 shrink-0">
                     ({viewingItems.length} {lang === 'tr' ? 'öğe' : 'items'})
                   </span>
                 </div>
@@ -1689,22 +1773,24 @@ export default function App() {
                   rel="noopener noreferrer"
                   className="text-xs text-neutral-500 hover:text-neutral-300 font-mono flex items-center gap-1 mt-0.5 truncate"
                 >
-                  <Globe className="w-3 h-3" />
+                  <Globe className="w-3 h-3 shrink-0" />
                   <span className="truncate">{viewingFeed.url}</span>
                 </a>
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
                 <button
                   onClick={() => handleCopyRss(viewingFeed.id)}
-                  className="px-3 py-1.5 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-neutral-200 text-xs font-medium flex items-center gap-1.5 border border-neutral-700/80 transition"
+                  className="px-2.5 sm:px-3 py-1.5 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-neutral-200 text-xs font-medium flex items-center gap-1.5 border border-neutral-700/80 transition min-h-[38px]"
                 >
                   <Copy className="w-3.5 h-3.5 text-amber-400" />
-                  <span>{lang === 'tr' ? 'RSS URL Kopyala' : 'Copy RSS URL'}</span>
+                  <span className="hidden sm:inline">{lang === 'tr' ? 'RSS URL Kopyala' : 'Copy RSS URL'}</span>
+                  <span className="sm:hidden">{lang === 'tr' ? 'Kopyala' : 'Copy'}</span>
                 </button>
                 <button
                   onClick={() => setViewingFeed(null)}
-                  className="p-1.5 rounded-lg hover:bg-neutral-800 text-neutral-400 hover:text-white transition"
+                  className="w-9 h-9 sm:w-8 sm:h-8 rounded-lg hover:bg-neutral-800 text-neutral-400 hover:text-white flex items-center justify-center transition"
+                  aria-label="Close"
                 >
                   <X className="w-5 h-5" />
                 </button>
@@ -1712,7 +1798,7 @@ export default function App() {
             </div>
 
             {/* Modal Body */}
-            <div className="p-5 overflow-y-auto space-y-4 flex-1">
+            <div className="p-3 sm:p-5 overflow-y-auto space-y-3 sm:space-y-4 flex-1">
               {loadingItems ? (
                 <div className="py-20 text-center text-neutral-500">
                   <RefreshCw className="w-8 h-8 animate-spin mx-auto mb-2 text-amber-500" />
@@ -1731,14 +1817,14 @@ export default function App() {
                 viewingItems.map((item, idx) => (
                   <article
                     key={idx}
-                    className="p-4 rounded-xl bg-neutral-950 border border-neutral-800/80 space-y-2 hover:border-neutral-700 transition"
+                    className="p-3.5 sm:p-4 rounded-xl bg-neutral-950 border border-neutral-800/80 space-y-2 hover:border-neutral-700 transition"
                   >
-                    <div className="flex gap-4">
+                    <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
                       {item.imageUrl && (
                         <img
                           src={item.imageUrl}
                           alt=""
-                          className="w-20 h-20 object-cover rounded-xl shrink-0 bg-neutral-900 border border-neutral-800"
+                          className="w-full sm:w-24 h-40 sm:h-24 object-cover rounded-xl shrink-0 bg-neutral-900 border border-neutral-800"
                           onError={(e) => {
                             (e.target as HTMLElement).style.display = 'none';
                           }}
@@ -1749,27 +1835,27 @@ export default function App() {
                           href={item.link}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="font-semibold text-sm text-neutral-100 hover:text-amber-400 transition flex items-center gap-1.5 group"
+                          className="font-semibold text-sm sm:text-base text-neutral-100 hover:text-amber-400 transition flex items-start gap-1.5 group"
                         >
                           <span className="line-clamp-2">{item.title}</span>
-                          <ExternalLink className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition shrink-0" />
+                          <ExternalLink className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition shrink-0 mt-1" />
                         </a>
                         {item.description && (
-                          <p className="text-xs text-neutral-400 mt-1 line-clamp-3">{item.description}</p>
+                          <p className="text-xs text-neutral-400 mt-1.5 line-clamp-3 leading-relaxed">{item.description}</p>
                         )}
                       </div>
                     </div>
 
-                    <div className="flex items-center justify-between text-[11px] font-mono text-neutral-500 pt-2 border-t border-neutral-900">
-                      <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center justify-between text-[11px] font-mono text-neutral-500 pt-2 border-t border-neutral-900 gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
                         {item.author && (
                           <span className="flex items-center gap-1">
-                            <User className="w-3 h-3 text-neutral-600" />
-                            <span>{item.author}</span>
+                            <User className="w-3 h-3 text-neutral-600 shrink-0" />
+                            <span className="truncate max-w-[120px] sm:max-w-xs">{item.author}</span>
                           </span>
                         )}
                         <span className="flex items-center gap-1">
-                          <Clock className="w-3 h-3 text-neutral-600" />
+                          <Clock className="w-3 h-3 text-neutral-600 shrink-0" />
                           <span>{item.pubDate}</span>
                         </span>
                       </div>
@@ -1777,7 +1863,7 @@ export default function App() {
                         href={item.link}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-amber-400/80 hover:text-amber-400 font-sans text-xs flex items-center gap-1"
+                        className="text-amber-400/80 hover:text-amber-400 font-sans text-xs flex items-center gap-1 shrink-0 ml-auto"
                       >
                         <span>{lang === 'tr' ? 'Habere Git' : 'Read original'}</span>
                         <ChevronRight className="w-3 h-3" />

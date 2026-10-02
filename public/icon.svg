@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bg-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f59e0b" />
+      <stop offset="100%" stop-color="#ea580c" />
+    </linearGradient>
+    <linearGradient id="wave-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff" />
+      <stop offset="100%" stop-color="#fef3c7" />
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#000000" flood-opacity="0.25" />
+    </filter>
+  </defs>
+
+  <!-- Background Rounded Canvas -->
+  <rect width="512" height="512" rx="112" fill="url(#bg-grad)" />
+
+  <!-- RSS Symbol with Safe Zone Alignment -->
+  <g transform="translate(100, 100)" filter="url(#shadow)">
+    <!-- Base Dot / Broadcast Center -->
+    <circle cx="56" cy="256" r="44" fill="url(#wave-grad)" />
+
+    <!-- Inner Wave -->
+    <path d="M 12 144 A 168 168 0 0 1 180 312" fill="none" stroke="url(#wave-grad)" stroke-width="44" stroke-linecap="round" />
+
+    <!-- Outer Wave -->
+    <path d="M 12 40 A 272 272 0 0 1 284 312" fill="none" stroke="url(#wave-grad)" stroke-width="44" stroke-linecap="round" />
+  </g>
+</svg>

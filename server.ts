@@ -251,6 +251,13 @@ app.get('/api/logs', (_req: Request, res: Response) => {
 });
 
 // Public RSS Feed XML Endpoint
+app.options(['/rss/:id.xml', '/rss/:id'], (_req: Request, res: Response) => {
+  res.set('Access-Control-Allow-Origin', '*');
+  res.set('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
+  res.set('Access-Control-Allow-Headers', '*');
+  res.sendStatus(204);
+});
+
 app.get(['/rss/:id.xml', '/rss/:id'], (req: Request, res: Response) => {
   const id = req.params.id.replace(/\.xml$/, '');
   const feed = db.getFeedById(id);
@@ -267,7 +274,15 @@ app.get(['/rss/:id.xml', '/rss/:id'], (req: Request, res: Response) => {
 
   const xml = generateRss20Xml(feed, items, selfUrl);
 
-  res.set('Content-Type', 'application/rss+xml; charset=utf-8');
+  const accept = req.get('accept') || '';
+  const contentType = accept.includes('text/xml')
+    ? 'text/xml; charset=utf-8'
+    : 'application/rss+xml; charset=utf-8';
+
+  res.set('Content-Type', contentType);
+  res.set('Access-Control-Allow-Origin', '*');
+  res.set('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
+  res.set('Access-Control-Allow-Headers', '*');
   res.set('Cache-Control', 'public, max-age=300'); // Cache 5 minutes
   res.send(xml);
 });
@@ -301,6 +316,9 @@ app.use((err: unknown, _req: Request, res: Response, _next: unknown) => {
 
 // Start scheduler
 scheduler.start();
+
+// Serve public directory for PWA assets & icons
+app.use(express.static(path.resolve(__dirname, 'public')));
 
 // Vite Middleware (Dev) or Static Dist (Prod)
 async function startServer() {
