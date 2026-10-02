@@ -33,8 +33,10 @@ import {
   Menu,
   ChevronDown
 } from 'lucide-react';
-import type { FeedConfig, FeedItem, SelectorConfig, DetectionResult } from './types.ts';
+import type { FeedConfig, FeedItem, SelectorConfig, DetectionResult, ScheduleConfig } from './types.ts';
 import { PWAInstallButton } from './PWAInstallBanner.tsx';
+import { ScheduleEditor } from './ScheduleEditor.tsx';
+import { formatScheduleSummary, formatNextRunRelative } from './scheduleUtils.ts';
 
 // Pre-configured templates for common website types
 const PRESETS = [
@@ -93,6 +95,7 @@ export default function App() {
   const [viewingFeed, setViewingFeed] = useState<FeedConfig | null>(null);
   const [viewingItems, setViewingItems] = useState<FeedItem[]>([]);
   const [loadingItems, setLoadingItems] = useState(false);
+  const [showReaderGuide, setShowReaderGuide] = useState(false);
 
   // Edit / Create Wizard State
   const [isEditing, setIsEditing] = useState(false);
@@ -102,6 +105,14 @@ export default function App() {
     url: '',
     description: '',
     refreshIntervalMinutes: 60,
+    schedule: {
+      mode: 'interval',
+      intervalMinutes: 60,
+      dailyTimes: ['09:00', '18:00'],
+      weeklyDays: [1],
+      weeklyTime: '09:00',
+      cronExpression: '0 9,18 * * 1-5',
+    } as ScheduleConfig,
     selectors: {
       itemContainer: 'article',
       title: 'h2 a',
@@ -322,6 +333,14 @@ export default function App() {
       name: preset.name,
       url: preset.url,
       refreshIntervalMinutes: preset.interval,
+      schedule: {
+        mode: 'interval',
+        intervalMinutes: preset.interval,
+        dailyTimes: ['09:00', '18:00'],
+        weeklyDays: [1],
+        weeklyTime: '09:00',
+        cronExpression: '0 9,18 * * 1-5',
+      },
       selectors: {
         ...prev.selectors,
         ...preset.selectors,
@@ -459,12 +478,21 @@ export default function App() {
 
   const handleEditClick = (feed: FeedConfig) => {
     setIsEditing(true);
+    const feedSchedule: ScheduleConfig = feed.schedule || {
+      mode: 'interval',
+      intervalMinutes: feed.refreshIntervalMinutes || 60,
+      dailyTimes: ['09:00', '18:00'],
+      weeklyDays: [1],
+      weeklyTime: '09:00',
+      cronExpression: '0 9,18 * * 1-5',
+    };
     setFeedForm({
       id: feed.id,
       name: feed.name,
       url: feed.url,
       description: feed.description || '',
       refreshIntervalMinutes: feed.refreshIntervalMinutes || 60,
+      schedule: feedSchedule,
       selectors: { ...feed.selectors },
       customHeaders: feed.customHeaders ? JSON.stringify(feed.customHeaders, null, 2) : '',
       userAgent: feed.userAgent || '',
@@ -518,6 +546,14 @@ export default function App() {
       url: discoveryResult.url,
       description: `Auto-generated feed for ${discoveryResult.url}`,
       refreshIntervalMinutes: 60,
+      schedule: {
+        mode: 'interval',
+        intervalMinutes: 60,
+        dailyTimes: ['09:00', '18:00'],
+        weeklyDays: [1],
+        weeklyTime: '09:00',
+        cronExpression: '0 9,18 * * 1-5',
+      },
       selectors: {
         ...discoveryResult.detectedSelectors,
       },
@@ -618,6 +654,14 @@ export default function App() {
                   url: '',
                   description: '',
                   refreshIntervalMinutes: 60,
+                  schedule: {
+                    mode: 'interval',
+                    intervalMinutes: 60,
+                    dailyTimes: ['09:00', '18:00'],
+                    weeklyDays: [1],
+                    weeklyTime: '09:00',
+                    cronExpression: '0 9,18 * * 1-5',
+                  },
                   selectors: {
                     itemContainer: 'article',
                     title: 'h2 a',
@@ -803,7 +847,38 @@ export default function App() {
                 </button>
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+              <>
+                {/* External Reader / Inoreader tip banner */}
+                <div className="mb-5 p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/20 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+                  <div className="flex items-center gap-2.5 text-amber-300">
+                    <Sparkles className="w-4 h-4 text-amber-400 shrink-0" />
+                    <span>
+                      {lang === 'tr'
+                        ? 'Inoreader, Feedly veya tarayıcı RSS eklentileriyle nasıl kullanılır?'
+                        : 'How to use these feeds with Inoreader, Feedly, or browser readers?'}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setShowReaderGuide(true)}
+                      className="px-3 py-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 font-medium transition flex items-center gap-1.5"
+                    >
+                      <BookOpen className="w-3.5 h-3.5" />
+                      <span>{lang === 'tr' ? 'Okuyucu Rehberi' : 'Reader Guide'}</span>
+                    </button>
+                    <a
+                      href="/opml.xml"
+                      download="webdenrssye-feeds.opml"
+                      className="px-3 py-1.5 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-neutral-200 transition flex items-center gap-1.5 font-medium border border-neutral-700/60"
+                    >
+                      <Download className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>{t.exportOpml}</span>
+                    </a>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
                 {feeds.map((feed) => {
                   const rssUrl = `${window.location.origin}/rss/${feed.id}.xml`;
                   const isRefreshing = refreshingFeedId === feed.id;
@@ -862,21 +937,56 @@ export default function App() {
                           </a>
                         </div>
 
-                        {/* Selectors Badge */}
-                        <div className="mt-3 bg-neutral-950/60 rounded-lg p-2 border border-neutral-800/80 font-mono text-[11px] text-neutral-400 space-y-1">
-                          <div className="flex justify-between">
-                            <span className="text-neutral-600">Container:</span>
-                            <span className="text-neutral-300 truncate ml-2">{feed.selectors.itemContainer}</span>
+                        {/* Feed Schedule & Selectors Badge */}
+                        <div className="mt-3 bg-neutral-950/80 rounded-xl p-2.5 border border-neutral-800/90 text-[11px] space-y-1.5">
+                          <div className="flex items-center justify-between text-neutral-400 font-mono">
+                            <span className="text-neutral-500 flex items-center gap-1">
+                              <Code className="w-3 h-3 text-neutral-600" />
+                              <span>CSS:</span>
+                            </span>
+                            <span className="text-neutral-300 truncate ml-2 max-w-[160px]">{feed.selectors.itemContainer}</span>
                           </div>
-                          <div className="flex justify-between">
-                            <span className="text-neutral-600">Interval:</span>
-                            <span className="text-neutral-300">{feed.refreshIntervalMinutes}m</span>
+                          <div className="flex items-center justify-between text-neutral-300 border-t border-neutral-900 pt-1.5">
+                            <span className="text-neutral-500 flex items-center gap-1 font-mono">
+                              <Clock className="w-3 h-3 text-amber-500/70" />
+                              <span>{lang === 'tr' ? 'Plan:' : 'Cadence:'}</span>
+                            </span>
+                            <span className="text-amber-400 font-medium truncate ml-2 text-right">
+                              {formatScheduleSummary(feed.schedule, feed.refreshIntervalMinutes, lang)}
+                            </span>
                           </div>
+                          {feed.nextScheduledAt && (
+                            <div className="flex items-center justify-between text-[10px] text-neutral-400 border-t border-neutral-900/60 pt-1">
+                              <span className="text-neutral-500 font-mono">{lang === 'tr' ? 'Sonraki:' : 'Next:'}</span>
+                              <span className="text-emerald-400 font-mono font-medium">
+                                {formatNextRunRelative(feed.nextScheduledAt, lang)}
+                              </span>
+                            </div>
+                          )}
                         </div>
 
                         {feed.lastErrorMessage && (
-                          <div className="mt-2 text-[11px] text-rose-400 bg-rose-950/40 p-2 rounded border border-rose-900/50">
-                            {feed.lastErrorMessage}
+                          <div className="mt-2.5 text-[11px] text-rose-300 bg-rose-950/40 p-2.5 rounded-xl border border-rose-900/60 space-y-1.5">
+                            <div className="flex items-start gap-1.5">
+                              <AlertCircle className="w-3.5 h-3.5 text-rose-400 shrink-0 mt-0.5" />
+                              <span className="font-mono leading-tight break-all">{feed.lastErrorMessage}</span>
+                            </div>
+                            <div className="flex items-center justify-between pt-1 border-t border-rose-900/40 text-[10px]">
+                              <span className="text-rose-400/80">
+                                {feed.lastErrorMessage.includes('timed out')
+                                  ? (lang === 'tr' ? 'Hedef sunucu geçici olarak yavaş' : 'Remote server timed out')
+                                  : (lang === 'tr' ? 'Tarama başarısız oldu' : 'Scrape attempt failed')}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => handleRefreshFeed(feed.id)}
+                                disabled={isRefreshing}
+                                className="px-2 py-0.5 rounded bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 hover:text-white font-medium flex items-center gap-1 transition disabled:opacity-50"
+                              >
+                                <RefreshCw className={`w-2.5 h-2.5 ${isRefreshing ? 'animate-spin' : ''}`} />
+                                <span>{lang === 'tr' ? 'Şimdi Yeniden Dene' : 'Retry Now'}</span>
+                              </button>
+                            </div>
                           </div>
                         )}
                       </div>
@@ -910,10 +1020,26 @@ export default function App() {
                           </button>
                           <a
                             href={`/rss/${feed.id}.xml`}
+                            download={`${feed.id}.xml`}
+                            className="p-1.5 rounded-md hover:bg-neutral-800 text-neutral-400 hover:text-emerald-400 transition shrink-0 flex items-center justify-center"
+                            title={lang === 'tr' ? 'XML Dosyasını İndir' : 'Download .xml file'}
+                          >
+                            <Download className="w-3.5 h-3.5" />
+                          </a>
+                          <button
+                            type="button"
+                            onClick={() => setShowReaderGuide(true)}
+                            className="p-1.5 rounded-md hover:bg-neutral-800 text-neutral-400 hover:text-amber-400 transition shrink-0 flex items-center justify-center"
+                            title={lang === 'tr' ? 'Inoreader / Feedly Entegrasyon Rehberi' : 'Inoreader Integration Guide'}
+                          >
+                            <BookOpen className="w-3.5 h-3.5" />
+                          </button>
+                          <a
+                            href={`/rss/${feed.id}.xml`}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="p-1.5 rounded-md hover:bg-neutral-800 text-neutral-400 hover:text-neutral-200 transition shrink-0 flex items-center justify-center"
-                            title="Open raw XML"
+                            title="Open raw XML in new tab"
                           >
                             <ExternalLink className="w-3.5 h-3.5" />
                           </a>
@@ -964,7 +1090,8 @@ export default function App() {
                   );
                 })}
               </div>
-            )}
+            </>
+          )}
           </div>
         )}
 
@@ -1217,29 +1344,31 @@ export default function App() {
                     </div>
                   </div>
 
-                  {/* Crawl Settings: Refresh Interval, Items */}
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  {/* Advanced Flexible Schedule Editor */}
+                  <ScheduleEditor
+                    schedule={feedForm.schedule || {
+                      mode: 'interval',
+                      intervalMinutes: feedForm.refreshIntervalMinutes || 60,
+                      dailyTimes: ['09:00', '18:00'],
+                      weeklyDays: [1],
+                      weeklyTime: '09:00',
+                      cronExpression: '0 9,18 * * 1-5',
+                    }}
+                    onChange={(newSchedule) => {
+                      setFeedForm({
+                        ...feedForm,
+                        schedule: newSchedule,
+                        refreshIntervalMinutes: newSchedule.intervalMinutes || feedForm.refreshIntervalMinutes,
+                      });
+                    }}
+                    lang={lang}
+                  />
+
+                  {/* Extra Crawl Limits: Max Items & Pages */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-xs font-medium text-neutral-300 mb-1">
-                        {lang === 'tr' ? 'Yenileme Aralığı (Dakika)' : 'Refresh Interval (Minutes)'}
-                      </label>
-                      <input
-                        type="number"
-                        min="5"
-                        max="1440"
-                        value={feedForm.refreshIntervalMinutes}
-                        onChange={(e) =>
-                          setFeedForm({
-                            ...feedForm,
-                            refreshIntervalMinutes: parseInt(e.target.value, 10) || 60,
-                          })
-                        }
-                        className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-3 py-2 text-sm text-neutral-100 focus:outline-none focus:border-amber-500"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium text-neutral-300 mb-1">
-                        {lang === 'tr' ? 'Maks Öğe Sayısı' : 'Max Items'}
+                        {lang === 'tr' ? 'Maksimum Öğe Sayısı' : 'Max Items to Keep'}
                       </label>
                       <input
                         type="number"
@@ -1257,7 +1386,7 @@ export default function App() {
                     </div>
                     <div>
                       <label className="block text-xs font-medium text-neutral-300 mb-1">
-                        {lang === 'tr' ? 'Sayfa Sayısı' : 'Pages to crawl'}
+                        {lang === 'tr' ? 'Sayfa Derinliği (Pagination)' : 'Pages to crawl'}
                       </label>
                       <input
                         type="number"
@@ -1767,15 +1896,30 @@ export default function App() {
                     ({viewingItems.length} {lang === 'tr' ? 'öğe' : 'items'})
                   </span>
                 </div>
-                <a
-                  href={viewingFeed.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-xs text-neutral-500 hover:text-neutral-300 font-mono flex items-center gap-1 mt-0.5 truncate"
-                >
-                  <Globe className="w-3 h-3 shrink-0" />
-                  <span className="truncate">{viewingFeed.url}</span>
-                </a>
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 text-xs">
+                  <a
+                    href={viewingFeed.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-neutral-500 hover:text-neutral-300 font-mono flex items-center gap-1 truncate max-w-xs"
+                  >
+                    <Globe className="w-3 h-3 shrink-0" />
+                    <span className="truncate">{viewingFeed.url}</span>
+                  </a>
+                  <span className="text-neutral-700 hidden sm:inline">&bull;</span>
+                  <span className="text-amber-400/90 flex items-center gap-1 text-[11px]">
+                    <Clock className="w-3 h-3 shrink-0" />
+                    <span>{formatScheduleSummary(viewingFeed.schedule, viewingFeed.refreshIntervalMinutes, lang)}</span>
+                  </span>
+                  {viewingFeed.nextScheduledAt && (
+                    <>
+                      <span className="text-neutral-700 hidden sm:inline">&bull;</span>
+                      <span className="text-emerald-400 font-mono text-[11px]">
+                        {lang === 'tr' ? 'Sonraki:' : 'Next:'} {formatNextRunRelative(viewingFeed.nextScheduledAt, lang)}
+                      </span>
+                    </>
+                  )}
+                </div>
               </div>
 
               <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
@@ -1872,6 +2016,132 @@ export default function App() {
                   </article>
                 ))
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* RSS Reader & Inoreader Guide Modal */}
+      {showReaderGuide && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4">
+          <div className="bg-neutral-900 border-t sm:border border-neutral-800 rounded-t-2xl sm:rounded-2xl w-full sm:max-w-2xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
+            {/* Header */}
+            <div className="p-4 sm:p-5 border-b border-neutral-800 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400">
+                  <Rss className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-base text-white">
+                    {lang === 'tr' ? 'Inoreader ve RSS Okuyucu Entegrasyon Rehberi' : 'Inoreader & RSS Reader Guide'}
+                  </h3>
+                  <p className="text-xs text-neutral-400">
+                    {lang === 'tr' ? 'Akışlarınızı harici okuyuculara sorunsuz ekleyin' : 'Connect your feeds to external readers'}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowReaderGuide(false)}
+                className="w-8 h-8 rounded-lg hover:bg-neutral-800 text-neutral-400 hover:text-white flex items-center justify-center transition"
+                aria-label="Close"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Content Body */}
+            <div className="p-5 overflow-y-auto space-y-4 text-xs">
+              {/* Root cause callout */}
+              <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-neutral-300 space-y-2">
+                <div className="flex items-center gap-2 text-amber-400 font-semibold">
+                  <AlertCircle className="w-4 h-4" />
+                  <span>
+                    {lang === 'tr'
+                      ? 'Inoreader Neden "We couldn\'t find any feeds" Uyarısı Verir?'
+                      : 'Why does Inoreader report "We couldn\'t find any feeds"?'}
+                  </span>
+                </div>
+                <p className="text-neutral-400 leading-relaxed">
+                  {lang === 'tr'
+                    ? 'Google AI Studio geliştirme ortamı (ais-dev-... adresi), Google oturumunuza özel olarak korunmaktadır. Inoreader veya Feedly gibi harici bulut sunucuları Google oturum çerezinize sahip olmadığı için doğrudan bu geliştirme adresine erişemez.'
+                    : 'The Google AI Studio development URL (ais-dev-...) is protected by your Google session. External cloud crawler bots like Inoreader or Feedly do not have your session cookie and receive an auth redirect instead of XML.'}
+                </p>
+              </div>
+
+              {/* Working Solutions */}
+              <h4 className="text-xs font-bold uppercase tracking-wider text-neutral-300 pt-1">
+                {lang === 'tr' ? 'Çalışan 4 Çözüm Yolu:' : '4 Working Solutions:'}
+              </h4>
+
+              {/* Solution 1 */}
+              <div className="p-3.5 rounded-xl bg-neutral-950 border border-neutral-800 space-y-2">
+                <div className="flex items-center gap-2 text-emerald-400 font-semibold">
+                  <span className="w-5 h-5 rounded-full bg-emerald-500/20 flex items-center justify-center text-[11px] font-bold">1</span>
+                  <span>{lang === 'tr' ? 'En Hızlı & Önerilen: Tarayıcı Eklentisi (Feedbro)' : 'Fastest: Browser Extension (Feedbro)'}</span>
+                </div>
+                <p className="text-neutral-400 leading-relaxed">
+                  {lang === 'tr'
+                    ? 'Tarayıcınıza (Chrome, Brave, Edge, Firefox) ücretsiz Feedbro veya RSS Reader eklentisini kurun. Kopyaladığınız XML linkini ekleyin. Tarayıcınızda oturum açık olduğu için anında çalışır ve yeni haber geldiğinde masaüstü bildirimi verir.'
+                    : 'Install Feedbro or a browser RSS extension. Add the XML URL directly. Since your browser has the active session, it works immediately with desktop notifications.'}
+                </p>
+              </div>
+
+              {/* Solution 2 */}
+              <div className="p-3.5 rounded-xl bg-neutral-950 border border-neutral-800 space-y-2">
+                <div className="flex items-center gap-2 text-amber-400 font-semibold">
+                  <span className="w-5 h-5 rounded-full bg-amber-500/20 flex items-center justify-center text-[11px] font-bold">2</span>
+                  <span>{lang === 'tr' ? 'Inoreader\'a OPML veya XML Dosyası Yükleme' : 'Upload OPML or XML into Inoreader'}</span>
+                </div>
+                <p className="text-neutral-400 leading-relaxed">
+                  {lang === 'tr'
+                    ? 'Üstteki "OPML İndir" butonuna basarak dosyanızı indirin. Inoreader\'da Tercihler > Abonelikler > İçe/Dışa Aktar (Import OPML) bölümünden dosyayı yükleyin.'
+                    : 'Click "Download OPML" to export your feed list. In Inoreader, go to Preferences > Subscriptions > Import OPML and upload the file.'}
+                </p>
+              </div>
+
+              {/* Solution 3 */}
+              <div className="p-3.5 rounded-xl bg-neutral-950 border border-neutral-800 space-y-2">
+                <div className="flex items-center gap-2 text-purple-400 font-semibold">
+                  <span className="w-5 h-5 rounded-full bg-purple-500/20 flex items-center justify-center text-[11px] font-bold">3</span>
+                  <span>{lang === 'tr' ? 'Uygulama İçi Dahili Okuyucu' : 'In-App Built-in Article Reader'}</span>
+                </div>
+                <p className="text-neutral-400 leading-relaxed">
+                  {lang === 'tr'
+                    ? 'Herhangi bir harici programa ihtiyaç duymadan akış kartındaki "Öğeleri Gör" butonuna tıklayarak haberleri resimleri, özetleri ve tarihleriyle okuyabilirsiniz.'
+                    : 'Click "View Articles" on any card to read articles with images, full summaries, and publication dates directly.'}
+                </p>
+              </div>
+
+              {/* Solution 4 */}
+              <div className="p-3.5 rounded-xl bg-neutral-950 border border-neutral-800 space-y-2">
+                <div className="flex items-center gap-2 text-sky-400 font-semibold">
+                  <span className="w-5 h-5 rounded-full bg-sky-500/20 flex items-center justify-center text-[11px] font-bold">4</span>
+                  <span>{lang === 'tr' ? 'Kendi Sunucunuza Dağıtım (Production Deploy)' : 'Production Deployment'}</span>
+                </div>
+                <p className="text-neutral-400 leading-relaxed">
+                  {lang === 'tr'
+                    ? 'Projeyi Vercel, Railway, Render veya kendi VPS sunucunuza `npm start` ile deploy ettiğinizde, genel adresiniz internete açık olur ve Inoreader bulut sunucuları akışı 7/24 otomatik tarar.'
+                    : 'Deploy the application to Vercel, Railway, Render or any VPS. Public production URLs are accessible by Inoreader 24/7 without authentication.'}
+                </p>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-4 border-t border-neutral-800 flex justify-end gap-2 bg-neutral-950/60">
+              <a
+                href="/opml.xml"
+                download="webdenrssye-feeds.opml"
+                className="px-3 py-1.5 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-neutral-200 font-medium transition flex items-center gap-1.5"
+              >
+                <Download className="w-3.5 h-3.5 text-emerald-400" />
+                <span>{lang === 'tr' ? 'OPML İndir' : 'Download OPML'}</span>
+              </a>
+              <button
+                onClick={() => setShowReaderGuide(false)}
+                className="px-4 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-neutral-950 font-semibold transition"
+              >
+                {lang === 'tr' ? 'Anladım' : 'Got it'}
+              </button>
             </div>
           </div>
         </div>

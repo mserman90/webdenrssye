@@ -22,13 +22,27 @@ export interface SelectorConfig {
   pagination?: string;
 }
 
+export type ScheduleMode = 'interval' | 'daily' | 'weekly' | 'custom_cron';
+
+export interface ScheduleConfig {
+  mode: ScheduleMode;
+  intervalMinutes?: number; // For mode === 'interval' (e.g. 15, 30, 60, 120, 360, 720, 1440)
+  dailyTimes?: string[]; // For mode === 'daily' (e.g. ["09:00", "14:30", "20:00"])
+  weeklyDays?: number[]; // For mode === 'weekly' (0 = Sun, 1 = Mon, ..., 6 = Sat)
+  weeklyTime?: string; // For mode === 'weekly' (e.g. "09:00")
+  cronExpression?: string; // For mode === 'custom_cron' (e.g. "0 9,18 * * 1-5")
+  timezone?: string; // e.g. "Europe/Istanbul"
+}
+
 export interface FeedConfig {
   id: string;
   name: string;
   description?: string;
   url: string;
   selectors: SelectorConfig;
-  refreshIntervalMinutes: number; // e.g. 30, 60, 120
+  refreshIntervalMinutes: number; // backward compatibility fallback (minutes)
+  schedule?: ScheduleConfig; // advanced flexible schedule
+  nextScheduledAt?: string; // estimated next execution timestamp
   customHeaders?: Record<string, string>;
   userAgent?: string;
   maxItems?: number;

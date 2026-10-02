@@ -224,6 +224,13 @@ app.post('/api/detect', async (req: Request, res: Response) => {
   }
 });
 
+app.options(['/rss/:id.xml', '/rss/:id'], (_req: Request, res: Response) => {
+  res.set('Access-Control-Allow-Origin', '*');
+  res.set('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
+  res.set('Access-Control-Allow-Headers', '*');
+  res.sendStatus(204);
+});
+
 app.get(['/rss/:id.xml', '/rss/:id'], (req: Request, res: Response) => {
   const id = req.params.id.replace(/\.xml$/, '');
   const feed = db.getFeedById(id);
@@ -240,7 +247,15 @@ app.get(['/rss/:id.xml', '/rss/:id'], (req: Request, res: Response) => {
 
   const xml = generateRss20Xml(feed, items, selfUrl);
 
-  res.set('Content-Type', 'application/rss+xml; charset=utf-8');
+  const accept = req.get('accept') || '';
+  const contentType = accept.includes('text/xml')
+    ? 'text/xml; charset=utf-8'
+    : 'application/rss+xml; charset=utf-8';
+
+  res.set('Content-Type', contentType);
+  res.set('Access-Control-Allow-Origin', '*');
+  res.set('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
+  res.set('Access-Control-Allow-Headers', '*');
   res.set('Cache-Control', 'public, max-age=300');
   res.send(xml);
 });

@@ -6,6 +6,7 @@ export interface FetchOptions {
   userAgent?: string;
   timeoutMs?: number;
   maxRedirects?: number;
+  retries?: number;
 }
 
 export interface FetchResult {
@@ -17,87 +18,109 @@ export interface FetchResult {
   durationMs: number;
 }
 
+const DEFAULT_TIMEOUT_MS = 35000;
+const DEFAULT_RETRIES = 2;
+
+async function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 export async function fetchWebPage(targetUrl: string, options: FetchOptions = {}): Promise<FetchResult> {
   const check = isSafeUrl(targetUrl);
   if (!check.safe || !check.url) {
     throw new Error(`Security validation blocked URL: ${check.reason || 'Invalid URL'}`);
   }
 
-  const timeoutMs = options.timeoutMs ?? 15000;
+  const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+  const maxRetries = options.retries ?? DEFAULT_RETRIES;
   const headers = getDefaultHeaders(options.headers, options.userAgent);
   const startTime = Date.now();
 
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  let lastError: Error | null = null;
 
-  try {
-    const response = await fetch(check.url.toString(), {
-      method: 'GET',
-      headers,
-      signal: controller.signal,
-      redirect: 'follow',
-    });
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
 
-    clearTimeout(timer);
+    try {
+      const response = await fetch(check.url.toString(), {
+        method: 'GET',
+        headers,
+        signal: controller.signal,
+        redirect: 'follow',
+      });
 
-    const finalUrl = response.url || targetUrl;
-    const finalCheck = isSafeUrl(finalUrl);
-    if (!finalCheck.safe) {
-      throw new Error(`Redirected to unsafe location: ${finalCheck.reason}`);
-    }
+      clearTimeout(timer);
 
-    if (!response.ok) {
-      throw new Error(`Target website returned HTTP ${response.status} (${response.statusText}): ${finalUrl}`);
-    }
-
-    const contentType = response.headers.get('content-type') || 'text/html';
-    
-    // Read response buffer to handle character encodings (e.g., ISO-8859-9 / Windows-1254 common in Turkish sites)
-    const arrayBuffer = await response.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
-
-    let html = '';
-    // Check if charset is specified in content-type
-    const charsetMatch = contentType.match(/charset=([^;]+)/i);
-    const charset = charsetMatch ? charsetMatch[1].trim().toLowerCase() : '';
-
-    if (charset === 'iso-8859-9' || charset === 'windows-1254') {
-      try {
-        const decoder = new TextDecoder('windows-1254');
-        html = decoder.decode(buffer);
-      } catch {
-        html = buffer.toString('utf-8');
+      const finalUrl = response.url || targetUrl;
+      const finalCheck = isSafeUrl(finalUrl);
+      if (!finalCheck.safe) {
+        throw new Error(`Redirected to unsafe location: ${finalCheck.reason}`);
       }
-    } else {
-      html = buffer.toString('utf-8');
-      // If HTML specifies <meta charset="windows-1254"> or similar in the first 1KB
-      const headChunk = html.slice(0, 1500);
-      const metaCharset = headChunk.match(/<meta[^>]+charset=["']?([^"'>/]+)/i);
-      if (metaCharset && (metaCharset[1].toLowerCase().includes('1254') || metaCharset[1].toLowerCase().includes('8859-9'))) {
+
+      if (!response.ok) {
+        throw new Error(`Target website returned HTTP ${response.status} (${response.statusText}): ${finalUrl}`);
+      }
+
+      const contentType = response.headers.get('content-type') || 'text/html';
+      
+      // Read response buffer to handle character encodings (e.g., ISO-8859-9 / Windows-1254 common in Turkish sites)
+      const arrayBuffer = await response.arrayBuffer();
+      const buffer = Buffer.from(arrayBuffer);
+
+      let html = '';
+      // Check if charset is specified in content-type
+      const charsetMatch = contentType.match(/charset=([^;]+)/i);
+      const charset = charsetMatch ? charsetMatch[1].trim().toLowerCase() : '';
+
+      if (charset === 'iso-8859-9' || charset === 'windows-1254') {
         try {
           const decoder = new TextDecoder('windows-1254');
           html = decoder.decode(buffer);
         } catch {
-          // keep utf-8
+          html = buffer.toString('utf-8');
+        }
+      } else {
+        html = buffer.toString('utf-8');
+        // If HTML specifies <meta charset="windows-1254"> or similar in the first 1.5KB
+        const headChunk = html.slice(0, 1500);
+        const metaCharset = headChunk.match(/<meta[^>]+charset=["']?([^"'>/]+)/i);
+        if (metaCharset && (metaCharset[1].toLowerCase().includes('1254') || metaCharset[1].toLowerCase().includes('8859-9'))) {
+          try {
+            const decoder = new TextDecoder('windows-1254');
+            html = decoder.decode(buffer);
+          } catch {
+            // keep utf-8
+          }
         }
       }
-    }
 
-    const durationMs = Date.now() - startTime;
+      const durationMs = Date.now() - startTime;
 
-    return {
-      url: finalUrl,
-      status: response.status,
-      statusText: response.statusText,
-      html,
-      contentType,
-      durationMs,
-    };
-  } catch (err: unknown) {
-    clearTimeout(timer);
-    if (err instanceof Error && err.name === 'AbortError') {
-      throw new Error(`Request timed out after ${timeoutMs}ms: ${targetUrl}`);
+      return {
+        url: finalUrl,
+        status: response.status,
+        statusText: response.statusText,
+        html,
+        contentType,
+        durationMs,
+      };
+    } catch (err: unknown) {
+      clearTimeout(timer);
+      const isAbort = err instanceof Error && err.name === 'AbortError';
+      const errMsg = isAbort
+        ? `Request timed out after ${timeoutMs}ms (attempt ${attempt}/${maxRetries}): ${targetUrl}`
+        : (err instanceof Error ? err.message : String(err));
+      
+      lastError = new Error(errMsg);
+
+      // If we still have retries remaining, wait briefly and retry
+      if (attempt < maxRetries) {
+        await sleep(1200 * attempt);
+        continue;
+      }
     }
-    throw err;
   }
+
+  throw lastError || new Error(`Failed to fetch ${targetUrl} after ${maxRetries} attempts`);
 }

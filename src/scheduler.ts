@@ -1,16 +1,20 @@
 import { db } from './db.ts';
 import { scrapeWithPagination } from './scraper.ts';
+import { isFeedDueForScrape, calculateNextRun } from './scheduleUtils.ts';
 import type { FeedConfig } from './types.ts';
 
 class ScraperScheduler {
   private intervalTimer: NodeJS.Timeout | null = null;
   private isRunning = false;
 
-  start(intervalMs = 60000) {
+  start(intervalMs = 30000) {
     if (this.intervalTimer) return;
     this.intervalTimer = setInterval(() => this.tick(), intervalMs);
-    // Initial scrape on startup for seed feeds after 3 seconds
-    setTimeout(() => this.scrapeAllActiveFeeds(), 3000);
+    // Initialize next scheduled times and perform initial scrape
+    setTimeout(() => {
+      this.refreshAllScheduledTimes();
+      this.scrapeAllActiveFeeds();
+    }, 2000);
   }
 
   stop() {
@@ -20,20 +24,37 @@ class ScraperScheduler {
     }
   }
 
+  refreshAllScheduledTimes() {
+    const feeds = db.getAllFeeds();
+    for (const feed of feeds) {
+      const nextRun = calculateNextRun(feed);
+      if (!feed.nextScheduledAt || feed.nextScheduledAt !== nextRun.toISOString()) {
+        db.saveFeed({
+          ...feed,
+          nextScheduledAt: nextRun.toISOString(),
+        });
+      }
+    }
+  }
+
   private async tick() {
     if (this.isRunning) return;
     this.isRunning = true;
 
     try {
       const feeds = db.getAllFeeds().filter((f) => f.isActive);
-      const now = Date.now();
+      const now = new Date();
 
       for (const feed of feeds) {
-        const lastScrapedTime = feed.lastScrapedAt ? new Date(feed.lastScrapedAt).getTime() : 0;
-        const intervalMs = (feed.refreshIntervalMinutes || 60) * 60 * 1000;
-
-        if (now - lastScrapedTime >= intervalMs) {
+        if (isFeedDueForScrape(feed, now)) {
           await this.scrapeFeed(feed);
+        } else {
+          // Keep nextScheduledAt updated
+          const nextRun = calculateNextRun(feed, now);
+          if (feed.nextScheduledAt !== nextRun.toISOString()) {
+            feed.nextScheduledAt = nextRun.toISOString();
+            db.saveFeed(feed);
+          }
         }
       }
     } catch (err) {
@@ -61,6 +82,17 @@ class ScraperScheduler {
       db.saveFeedItems(feed.id, result.items);
       const durationMs = Date.now() - startTime;
 
+      const nextScheduledAt = calculateNextRun(feed, new Date()).toISOString();
+
+      db.saveFeed({
+        ...feed,
+        lastScrapedAt: new Date().toISOString(),
+        lastScrapedStatus: 'success',
+        lastErrorMessage: undefined,
+        itemCount: result.items.length,
+        nextScheduledAt,
+      });
+
       db.addLog({
         id: `log-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
         feedId: feed.id,
@@ -74,7 +106,16 @@ class ScraperScheduler {
       return { success: true, itemCount: result.items.length };
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : String(err);
-      db.setFeedError(feed.id, errorMessage);
+      const nextScheduledAt = calculateNextRun(feed, new Date()).toISOString();
+
+      db.saveFeed({
+        ...feed,
+        lastScrapedAt: new Date().toISOString(),
+        lastScrapedStatus: 'error',
+        lastErrorMessage: errorMessage,
+        nextScheduledAt,
+      });
+
       const durationMs = Date.now() - startTime;
 
       db.addLog({

@@ -8,6 +8,7 @@ import { fetchWebPage } from './src/fetcher.ts';
 import { generateRss20Xml, generateOpmlXml } from './src/rss.ts';
 import { isSafeUrl } from './src/security.ts';
 import { authMiddleware } from './src/auth.ts';
+import { calculateNextRun } from './src/scheduleUtils.ts';
 import type { FeedConfig, SelectorConfig } from './src/types.ts';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -61,6 +62,7 @@ app.post('/api/feeds', authMiddleware, async (req: Request, res: Response) => {
       url,
       selectors,
       refreshIntervalMinutes = 60,
+      schedule,
       customHeaders,
       userAgent,
       maxItems = 30,
@@ -87,6 +89,7 @@ app.post('/api/feeds', authMiddleware, async (req: Request, res: Response) => {
       .replace(/(^-|-$)+/g, '') || `feed-${Date.now()}`;
 
     const feedId = req.body.id || `${slug}-${Math.random().toString(36).substring(2, 6)}`;
+    const parsedMinutes = Math.max(5, parseInt(String(refreshIntervalMinutes), 10) || 60);
 
     const feedConfig: FeedConfig = {
       id: feedId,
@@ -104,7 +107,11 @@ app.post('/api/feeds', authMiddleware, async (req: Request, res: Response) => {
         image: selectors.image || '',
         pagination: selectors.pagination || '',
       },
-      refreshIntervalMinutes: Math.max(5, parseInt(String(refreshIntervalMinutes), 10) || 60),
+      refreshIntervalMinutes: parsedMinutes,
+      schedule: schedule || {
+        mode: 'interval',
+        intervalMinutes: parsedMinutes,
+      },
       customHeaders,
       userAgent,
       maxItems,
@@ -114,6 +121,8 @@ app.post('/api/feeds', authMiddleware, async (req: Request, res: Response) => {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
+
+    feedConfig.nextScheduledAt = calculateNextRun(feedConfig, new Date()).toISOString();
 
     const saved = db.saveFeed(feedConfig);
 
@@ -136,12 +145,15 @@ app.put('/api/feeds/:id', authMiddleware, (req: Request, res: Response) => {
     return;
   }
 
-  const updated = db.saveFeed({
+  const updatedFeed: FeedConfig = {
     ...existing,
     ...req.body,
     id: existing.id,
     updatedAt: new Date().toISOString(),
-  });
+  };
+
+  updatedFeed.nextScheduledAt = calculateNextRun(updatedFeed, new Date()).toISOString();
+  const updated = db.saveFeed(updatedFeed);
 
   res.json(updated);
 });

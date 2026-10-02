@@ -27,6 +27,10 @@ class MemoryDatabase {
           description: '',
         },
         refreshIntervalMinutes: 60,
+        schedule: {
+          mode: 'interval',
+          intervalMinutes: 60,
+        },
         isActive: true,
         itemCount: 0,
         createdAt: new Date().toISOString(),
